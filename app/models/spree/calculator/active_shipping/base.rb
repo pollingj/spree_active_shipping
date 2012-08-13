@@ -9,7 +9,7 @@ module Spree
   class Calculator < ActiveRecord::Base
     module ActiveShipping
       class Base < Calculator
-        MAX_WEIGHT_PER_PACKAGE = 70
+        MAX_WEIGHT_PER_PACKAGE = 70000
 
         include ActiveMerchant::Shipping
 
@@ -121,6 +121,7 @@ module Spree
 
         # Generates an array of Package objects based on the quantities and weights of the variants in the line items
          def packages(order)
+           puts "in here"
             split_packages = Array.new
             number_of_packages = 1
             multiplier = Spree::ActiveShipping::Config[:unit_multiplier]
@@ -132,18 +133,24 @@ module Spree
             end
             
             if weight > MAX_WEIGHT_PER_PACKAGE
-              number_of_packages = (weight / MAX_WEIGHT_PER_PACKAGE)
+              number_of_packages = (weight.to_i / MAX_WEIGHT_PER_PACKAGE)
               number_of_packages += 1 if weight % MAX_WEIGHT_PER_PACKAGE > 0
             end
+            
+            puts weight
+            puts number_of_packages
+            puts "+++++++++++++"
         
             packages_weight = weight
-            [0..number_of_packages].each do 
+            (1..number_of_packages).each do 
               if packages_weight > MAX_WEIGHT_PER_PACKAGE
                 package_weight = MAX_WEIGHT_PER_PACKAGE
                 packages_weight -= MAX_WEIGHT_PER_PACKAGE
               else
                 package_weight = packages_weight
               end
+              puts package_weight
+              Spree::ActiveShipping::Config[:units].to_sym
               split_packages << Package.new(package_weight, [], :units => Spree::ActiveShipping::Config[:units].to_sym)
             end
             #package = Package.new(weight, [], :units => Spree::ActiveShipping::Config[:units].to_sym)
