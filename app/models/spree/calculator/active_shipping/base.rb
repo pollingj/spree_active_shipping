@@ -9,6 +9,8 @@ module Spree
   class Calculator < ActiveRecord::Base
     module ActiveShipping
       class Base < Calculator
+        MAX_WEIGHT_PER_PACKAGE = 70
+
         include ActiveMerchant::Shipping
 
         def self.service_name
@@ -118,18 +120,37 @@ module Spree
         private
 
         # Generates an array of Package objects based on the quantities and weights of the variants in the line items
-        def packages(order)
-          multiplier = Spree::ActiveShipping::Config[:unit_multiplier]
-          default_weight = Spree::ActiveShipping::Config[:default_weight]
-          
-          weight = order.line_items.inject(0) do |weight, line_item|
-            item_weight = line_item.variant.weight.present? ? line_item.variant.weight : default_weight
-            weight + (line_item.quantity * item_weight * multiplier)
+         def packages(order)
+            split_packages = Array.new
+            number_of_packages = 1
+            multiplier = Spree::ActiveShipping::Config[:unit_multiplier]
+            default_weight = Spree::ActiveShipping::Config[:default_weight]
+        
+            weight = order.line_items.inject(0) do |weight, line_item|
+              item_weight = line_item.variant.weight.present? ? line_item.variant.weight : default_weight
+              weight + (line_item.quantity * item_weight * multiplier)
+            end
+            
+            if weight > MAX_WEIGHT_PER_PACKAGE
+              number_of_packages = (weight / MAX_WEIGHT_PER_PACKAGE)
+              number_of_packages += 1 if weight % MAX_WEIGHT_PER_PACKAGE > 0
+            end
+        
+            packages_weight = weight
+            [0..number_of_packages].each do 
+              if packages_weight > MAX_WEIGHT_PER_PACKAGE
+                package_weight = MAX_WEIGHT_PER_PACKAGE
+                packages_weight -= MAX_WEIGHT_PER_PACKAGE
+              else
+                package_weight = packages_weight
+              end
+              split_packages << Package.new(package_weight, [], :units => Spree::ActiveShipping::Config[:units].to_sym)
+            end
+            #package = Package.new(weight, [], :units => Spree::ActiveShipping::Config[:units].to_sym)
+            #[package]
+            
+            split_packages
           end
-          
-          package = Package.new(weight, [], :units => Spree::ActiveShipping::Config[:units].to_sym)
-          [package]
-        end
 
         def cache_key(order)
           addr = order.ship_address
